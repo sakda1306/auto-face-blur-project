@@ -29,7 +29,7 @@ feature/...       ●───●   ●───●
 # 0) ครั้งแรกครั้งเดียว
 git clone https://github.com/sakda1306/auto-face-blur-project.git
 cd auto-face-blur-project
-python -m venv .venv
+py -3.12 -m venv .venv          # ต้องใช้ Python 3.12
 .venv\Scripts\activate
 pip install -r requirements.txt
 

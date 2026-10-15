@@ -61,7 +61,8 @@
 | Output | รายการ `BBox` ของทุกใบหน้า เรียงจากซ้ายไปขวา (ตามค่า `x`) |
 | ไม่พบใบหน้า | คืนค่า `[]` (ห้าม raise error) |
 | Side effect | ห้ามแก้ไข `image` ต้นฉบับ |
-| Implementation | ใช้ MediaPipe Face Detection เป็นหลัก และ Haar Cascade เป็นตัวสำรองถ้าโหลด MediaPipe ไม่ได้ โมเดลต้องสร้างครั้งเดียว (lazy singleton) ห้ามสร้างใหม่ทุกเฟรม |
+| Implementation | ใช้ MediaPipe **Tasks API** (`mediapipe.tasks.python.vision.FaceDetector`) กับโมเดล `models/blaze_face_short_range.tflite` เป็นหลัก และ Haar Cascade (`cv2.data.haarcascades`) เป็นตัวสำรองถ้าโหลด MediaPipe ไม่ได้ โมเดลต้องสร้างครั้งเดียว (lazy singleton) ห้ามสร้างใหม่ทุกเฟรม |
+| หมายเหตุ | mediapipe 1.x **ไม่มี** `mp.solutions.face_detection` แบบเก่าแล้ว ตัวอย่างโค้ดเก่าในอินเทอร์เน็ตจะใช้ไม่ได้ และ Tasks API รับภาพเป็น RGB (`mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)`) จึงต้องแปลงจาก BGR ก่อนส่งเข้าโมเดล |
 
 ### 3.2 `clip_box(box, image_shape) -> BBox | None`
 บีบ BBox ให้อยู่ในขอบภาพ ถ้าหลังบีบแล้ว `w ≤ 0` หรือ `h ≤ 0` ให้คืน `None`
@@ -128,17 +129,25 @@
 
 ---
 
-## 5. Dependencies (`requirements.txt`)
+## 5. Runtime & Dependencies
+
+**Python 3.12** (ทุกเครื่องในทีมต้องใช้เวอร์ชันนี้ เพราะ numpy 2.5 ขึ้นไปรองรับเฉพาะ Python ≥ 3.12)
+
+`requirements.txt` ระบุเวอร์ชันตายตัว ซึ่งทดสอบแล้วว่าติดตั้งและรัน `FaceDetector` ได้บน Python 3.12 / Windows
 
 ```text
-opencv-python
-mediapipe
-numpy
-streamlit
-streamlit-webrtc
+opencv-python==5.0.0.93
+mediapipe==1.0.1
+numpy==2.5.3
+streamlit==1.65.0
+streamlit-webrtc==0.78.1
 ```
 
-ถ้าต้องเพิ่มไลบรารี ให้แก้ทั้ง `requirements.txt` และหัวข้อนี้ใน PR เดียวกัน
+| ไฟล์ | ที่มา |
+|------|------|
+| `models/blaze_face_short_range.tflite` | โมเดลตรวจจับใบหน้าระยะใกล้ของ MediaPipe (230 KB) commit ไว้ใน repo เพื่อไม่ต้องดาวน์โหลดตอนรัน |
+
+ถ้าต้องเพิ่มหรืออัปเกรดไลบรารี ให้แก้ทั้ง `requirements.txt` และหัวข้อนี้ใน PR เดียวกัน และต้องทดสอบติดตั้งใน venv ใหม่ก่อนเปิด PR
 
 ---
 

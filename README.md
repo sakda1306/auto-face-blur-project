@@ -13,6 +13,7 @@ Mini Project — Image and Audio Processing (Computer Vision)
 ## Project Structure
 ```text
 ├── docs/             # Contract, Git Flow, Schedule
+├── models/           # โมเดลตรวจจับใบหน้า (blaze_face_short_range.tflite)
 ├── test_images/      # ภาพสำหรับทดสอบ
 ├── detector.py       # ตรวจจับใบหน้าและฟังก์ชันเบลอ/โมเสก
 ├── webcam_demo.py    # รันผ่านกล้องสดแบบ Real-time
@@ -21,8 +22,10 @@ Mini Project — Image and Audio Processing (Computer Vision)
 ```
 
 ## Setup
+ต้องใช้ **Python 3.12** (เช็คด้วย `py -3.12 --version`) ทุกเครื่องในทีมต้องใช้เวอร์ชันเดียวกัน
+
 ```bash
-python -m venv .venv
+py -3.12 -m venv .venv
 .venv\Scripts\activate        # Windows
 pip install -r requirements.txt
 ```
