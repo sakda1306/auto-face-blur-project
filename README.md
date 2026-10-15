@@ -12,6 +12,7 @@ Mini Project — Image and Audio Processing (Computer Vision)
 
 ## Project Structure
 ```text
+├── docs/             # Contract, Git Flow, Schedule
 ├── test_images/      # ภาพสำหรับทดสอบ
 ├── detector.py       # ตรวจจับใบหน้าและฟังก์ชันเบลอ/โมเสก
 ├── webcam_demo.py    # รันผ่านกล้องสดแบบ Real-time
@@ -28,14 +29,19 @@ pip install -r requirements.txt
 
 ## Run
 ```bash
-streamlit run app.py          # Web UI
-python webcam_demo.py         # Webcam demo
+streamlit run app.py          # Web App (Image + Live Webcam)
+python webcam_demo.py         # (optional) ทดสอบกล้องบนเครื่องโดยไม่ผ่านเว็บ
 ```
+
+## Docs
+- [Contract](docs/CONTRACT.md): สถาปัตยกรรม, API ของ `detector.py`, UI, Test
+- [Git Flow](docs/GIT_FLOW.md): Branch, Commit, Pull Request
+- [Schedule](docs/SCHEDULE.md): แบ่งงาน 4 คน, ตารางเวลา 2 วัน, Checklist
 
 ## Git Workflow
 - `main` — โค้ดที่พร้อมส่ง/นำเสนอ
 - `develop` — branch หลักสำหรับรวมงาน (default)
-- `feature/<ชื่องาน>` — แตกจาก `develop` แล้วเปิด Pull Request กลับเข้า `develop`
+- `feature/<ชื่องาน>` — แตกจาก `develop` แล้วเปิด Pull Request กลับเข้า `develop` (รายละเอียดใน [GIT_FLOW.md](docs/GIT_FLOW.md))
 
 ## Team
 | ชื่อ | รหัสนักศึกษา | หน้าที่ |
