@@ -108,7 +108,7 @@
 | Widget | Label | ค่าที่ส่งเข้า `blur_faces` |
 |--------|-------|------------------------|
 | `st.radio` | `Gaussian Blur` / `Mosaic` / `BBox Only` | `"blur"` / `"mosaic"` / `"bbox"` |
-| `st.slider` | `ความเข้มข้น` (1–100, ค่าเริ่มต้น 50) | `strength` |
+| `st.slider` | `ความเข้มข้น` (1–100, ค่าเริ่มต้น 50) ซ่อนในโหมด `BBox Only` เพราะไม่ใช้ค่านี้ (ส่ง 50) | `strength` |
 
 ### 4.2 หน้าหลัก (Image Upload)
 1. `st.file_uploader` รับ `jpg`, `jpeg`, `png`
@@ -116,7 +116,7 @@
 3. เรียก `blur_faces(image, mode, strength)`
 4. แสดงผลด้วย `st.columns(2)`: ซ้าย **Before** ขวา **After** (แปลงเป็น RGB ก่อนแสดง)
 5. `st.metric("จำนวนใบหน้าที่พบ", face_count)` ถ้าเป็น 0 ให้แสดง `st.info("ไม่พบใบหน้าในภาพ")`
-6. `st.download_button` ดาวน์โหลดเป็น PNG ชื่อ `<ชื่อไฟล์เดิม>_blurred.png`
+6. `st.download_button` ดาวน์โหลดเป็น PNG ชื่อ `<ชื่อไฟล์เดิม>_blurred.png` และมีปุ่ม JPG (`_blurred.jpg`, quality 92) สำหรับไฟล์เล็ก
 
 ### 4.3 Caching
 ตัวตรวจจับใบหน้าต้องสร้างครั้งเดียวต่อ process (singleton ใน `detector.py`) ห้ามสร้างใหม่ทุกครั้งที่ Streamlit rerun (ทุกครั้งที่ขยับ Slider)
