@@ -20,3 +20,6 @@ Thumbs.db
 output/
 *.mp4
 *.avi
+
+# Tests
+.pytest_cache/
