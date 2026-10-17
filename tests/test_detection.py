@@ -88,6 +88,29 @@ def test_detect_multiple_faces_sorted_left_to_right(portrait):
         assert_inside(box, pair.shape)
 
 
+@pytest.mark.parametrize("scale", [3, 5, 7])
+def test_high_resolution_photo_has_no_false_faces(portrait, scale):
+    # Camera photos are often 6000 px wide; tiles there see skin and cloth texture as faces.
+    big = cv2.resize(portrait, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+    boxes = detector.detect_faces(big)
+    assert len(boxes) == 1
+    x, y, w, h = boxes[0]
+    assert x < 400 * scale < x + w
+    assert y < 200 * scale < y + h
+
+
+@pytest.mark.parametrize("width, at_least", [(640, 6), (480, 5)])
+def test_small_crowd_image(portrait, width, at_least):
+    # Issue #6: a small web image of a crowd, faces only 15-40 px wide.
+    canvas = place_faces(portrait, [120, 100, 80, 80, 60, 60])
+    scale = width / canvas.shape[1]
+    small = cv2.resize(canvas, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    boxes = detector.detect_faces(small)
+    assert at_least <= len(boxes) <= 6
+    for box in boxes:
+        assert_inside(box, small.shape)
+
+
 def test_no_false_face_on_background(portrait):
     # The eagle seal behind the face looks like a face to the model inside a tile.
     triple = np.hstack([portrait, portrait, portrait])
@@ -130,17 +153,31 @@ def test_high_min_confidence_filters_faces(portrait):
     assert detector.detect_faces(portrait, min_confidence=1.0) == []
 
 
-def test_haar_fallback_when_mediapipe_unavailable(portrait, monkeypatch):
-    def broken():
-        raise RuntimeError("mediapipe not available")
+def broken():
+    raise RuntimeError("model not available")
 
-    monkeypatch.setattr(detector, "_create_mediapipe_detector", broken)
+
+@pytest.mark.parametrize("missing", [
+    ["_create_mediapipe_detector"],
+    ["_create_yunet_detector"],
+    ["_create_mediapipe_detector", "_create_yunet_detector"],  # falls back to Haar
+])
+def test_detection_works_when_a_model_is_missing(portrait, monkeypatch, missing):
+    for name in missing:
+        monkeypatch.setattr(detector, name, broken)
     monkeypatch.setattr(detector, "_detector", None)
     boxes = detector.detect_faces(portrait)
     assert len(boxes) == 1
     x, y, w, h = boxes[0]
     assert x < 400 < x + w
     assert y < 200 < y + h
+
+
+def test_haar_is_not_used_when_a_main_model_works(monkeypatch):
+    monkeypatch.setattr(detector, "_create_haar_detector", broken)
+    monkeypatch.setattr(detector, "_create_yunet_detector", broken)
+    monkeypatch.setattr(detector, "_detector", None)
+    assert detector.detect_faces(np.zeros((100, 100, 3), dtype=np.uint8)) == []
 
 
 def test_detector_is_created_once(portrait, monkeypatch):

@@ -1,5 +1,6 @@
 """Tests for role B: apply_gaussian_blur, apply_mosaic, blur_faces (docs/CONTRACT.md 3.3, 3.4, 3.6)."""
 
+import time
 from pathlib import Path
 
 import cv2
@@ -38,6 +39,21 @@ def test_blur_kernel_follows_contract(noise, strength, k):
 def test_blur_tiny_roi_uses_minimum_kernel():
     roi = np.zeros((2, 2, 3), dtype=np.uint8)
     assert detector.apply_gaussian_blur(roi, 100).shape == (2, 2, 3)
+
+
+def test_blur_large_face_is_fast_and_looks_the_same(portrait):
+    # A close-up phone photo can have a 4000 px face; the contract kernel would then be
+    # ~2000 px wide and take minutes. Large faces are blurred at a smaller size instead.
+    roi = cv2.resize(portrait[100:500, 250:650], (600, 600), interpolation=cv2.INTER_CUBIC)
+    exact = cv2.GaussianBlur(roi, (301, 301), 0)  # contract kernel for 600 px, strength 50
+    result = detector.apply_gaussian_blur(roi, 50)
+    assert result.shape == roi.shape and result.dtype == np.uint8
+    assert np.abs(result.astype(int) - exact.astype(int)).mean() < 3
+
+    huge = cv2.resize(roi, (3000, 3000), interpolation=cv2.INTER_LINEAR)
+    start = time.perf_counter()
+    assert detector.apply_gaussian_blur(huge, 100).shape == huge.shape
+    assert time.perf_counter() - start < 1.0
 
 
 def test_stronger_blur_removes_more_detail(noise):

@@ -57,9 +57,9 @@
 | Input | `image: Image`, `min_confidence: float` ในช่วง `0.0–1.0` |
 | Output | รายการ `BBox` ของทุกใบหน้า เรียงจากซ้ายไปขวา (ตามค่า `x`) |
 | ไม่พบใบหน้า | คืนค่า `[]` (ห้าม raise error) |
-| ใบหน้าเล็ก | โมเดล short range ย่อภาพเหลือ 128×128 ทำให้หน้าเล็กในภาพใหญ่หายไป จึงตรวจทั้งภาพ + ตรวจซ้ำบน Tile ขนาด 640 และ 320 px (ซ้อนกัน 25%) แล้วรวมกรอบที่ทับกันเกิน 50% เป็นกรอบเดียว (union) หน้าที่เจอใน Tile ต้องตรวจซ้ำในภาพที่ crop รอบกรอบขนาด 2 เท่าแล้วยังเจอ (score ของการตรวจซ้ำใช้เทียบกับ `min_confidence`) เพื่อกัน False positive ที่เกิดจาก Tile ตรวจได้ถึงหน้ากว้าง ~40 px ในภาพ 1920×1080 (~0.1–0.4 วินาที/ภาพ) |
+| ขนาดภาพ | ย่อ/ขยายภาพให้ด้านยาวเท่ากับ `WORK_SIZE = 1920` px ก่อนตรวจ แล้วแปลงกรอบกลับเป็นพิกัดของภาพเดิม (ภาพเล็กแบบ thumbnail ในเว็บมีหน้าเล็กเกินกว่าโมเดลจะเห็น ส่วนภาพกล้อง 6000 px ช้าโดยไม่ได้อะไรเพิ่ม) |
 | Side effect | ห้ามแก้ไข `image` ต้นฉบับ |
-| Implementation | ใช้ MediaPipe **Tasks API** (`mediapipe.tasks.python.vision.FaceDetector`) กับโมเดล `models/blaze_face_short_range.tflite` เป็นหลัก และ Haar Cascade (`models/haarcascade_frontalface_default.xml`) เป็นตัวสำรองถ้าโหลด MediaPipe ไม่ได้ โมเดลต้องสร้างครั้งเดียว (lazy singleton) ห้ามสร้างใหม่ทุกครั้งที่เรียก |
+| Implementation | ใช้ **2 โมเดลร่วมกัน** แล้วรวมกรอบที่ทับกันเกิน 50% เป็นกรอบเดียว (union): (1) MediaPipe **Tasks API** (`mediapipe.tasks.python.vision.FaceDetector`) กับ `models/blaze_face_short_range.tflite` ซึ่งเก่งหน้าใหญ่ใกล้กล้องและหน้าด้านข้าง (2) OpenCV **YuNet** (`cv2.FaceDetectorYN`) กับ `models/face_detection_yunet_2023mar.onnx` ซึ่งเก่งหน้าเล็กในฝูงชน ใช้กรอบที่ score ≥ `YUNET_MIN_SCORE = 0.7` ถ้าโหลดโมเดลใดไม่ได้ให้ใช้อีกตัว ถ้าโหลดไม่ได้ทั้งคู่ให้ใช้ Haar Cascade (`models/haarcascade_frontalface_default.xml`) เป็นตัวสำรอง โมเดลต้องสร้างครั้งเดียว (lazy singleton) ห้ามสร้างใหม่ทุกครั้งที่เรียก |
 | หมายเหตุ | mediapipe 1.x **ไม่มี** `mp.solutions.face_detection` แบบเก่าแล้ว ตัวอย่างโค้ดเก่าในอินเทอร์เน็ตจะใช้ไม่ได้ และ Tasks API รับภาพเป็น RGB (`mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)`) จึงต้องแปลงจาก BGR ก่อนส่งเข้าโมเดล และ opencv-python 5.x **ไม่มีไฟล์ Haar `.xml` มาให้** ใน `cv2.data.haarcascades` แล้ว จึงต้องใช้ไฟล์ใน `models/` |
 
 ### 3.2 `clip_box(box, image_shape) -> BBox | None`
@@ -73,6 +73,8 @@
 | Kernel | `k = max(3, int(min(h, w) * strength / 100))` แล้วบังคับเป็นเลขคี่ด้วย `k = k \| 1` ใช้ `(k, k)` กับ `cv2.GaussianBlur` |
 
 > สูตรนี้ทำให้ **ขนาดเคอร์เนลแปรผันตามขนาดใบหน้า** โดยอัตโนมัติ (ฟีเจอร์เสริม): หน้าใหญ่ได้ `k` สูง หน้าเล็กได้ `k` ต่ำ
+>
+> **หน้าใหญ่:** ถ้า `min(h, w) > BLUR_MAX_SIDE = 256` ให้ย่อ ROI ให้ด้านสั้นเหลือ 256 px เบลอด้วยสูตรเดิม แล้วขยายกลับ (`INTER_LINEAR`) เพราะ kernel ที่โตตามหน้าทำให้หน้ากว้าง 4000 px ใช้เวลาหลายนาที ผลที่ได้แทบไม่ต่างจากการเบลอเต็มขนาด
 
 ### 3.4 `apply_mosaic(roi, strength) -> Image`
 | | |
@@ -137,6 +139,7 @@ streamlit==1.65.0
 | ไฟล์ | ที่มา |
 |------|------|
 | `models/blaze_face_short_range.tflite` | โมเดลตรวจจับใบหน้าระยะใกล้ของ MediaPipe (230 KB) commit ไว้ใน repo เพื่อไม่ต้องดาวน์โหลดตอนรัน |
+| `models/face_detection_yunet_2023mar.onnx` | โมเดลตรวจจับใบหน้า YuNet (230 KB, MIT License) จาก [opencv_zoo](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet) |
 | `models/haarcascade_frontalface_default.xml` | Haar Cascade ตรวจจับใบหน้า (930 KB) จาก repo OpenCV branch `4.x` ใช้เป็นตัวสำรอง |
 
 ถ้าต้องเพิ่มหรืออัปเกรดไลบรารี ให้แก้ทั้ง `requirements.txt` และหัวข้อนี้ใน PR เดียวกัน และต้องทดสอบติดตั้งใน venv ใหม่ก่อนเปิด PR
