@@ -2,13 +2,14 @@
 
 Mini Project — Image and Audio Processing (Computer Vision)
 
-ระบบตรวจจับและเซ็นเซอร์ใบหน้าในภาพนิ่ง วิดีโอ และกล้อง Webcam โดยอัตโนมัติ เพื่อคุ้มครองความเป็นส่วนตัว (PDPA)
+Web App ตรวจจับและเซ็นเซอร์ใบหน้าในภาพที่ผู้ใช้อัปโหลดโดยอัตโนมัติ เพื่อคุ้มครองความเป็นส่วนตัว (PDPA)
 
 ## Features
 - ตรวจจับใบหน้าได้หลายใบหน้าพร้อมกัน (Multi-face Detection)
 - เซ็นเซอร์ได้ 2 แบบ: Gaussian Blur และ Pixelation (Mosaic)
 - ปรับระดับความเบลอผ่าน Slider
-- รองรับการอัปโหลดภาพและกล้อง Webcam แบบ Real-time
+- อัปโหลดภาพ (JPG/PNG) → เปรียบเทียบ Before/After → ดาวน์โหลดผลลัพธ์
+- ไม่ใช้กล้อง/Webcam (อยู่นอกขอบเขตงาน)
 
 ## Project Structure
 ```text
@@ -16,7 +17,6 @@ Mini Project — Image and Audio Processing (Computer Vision)
 ├── models/           # โมเดลตรวจจับใบหน้า (blaze_face_short_range.tflite)
 ├── test_images/      # ภาพสำหรับทดสอบ
 ├── detector.py       # ตรวจจับใบหน้าและฟังก์ชันเบลอ/โมเสก
-├── webcam_demo.py    # รันผ่านกล้องสดแบบ Real-time
 ├── app.py            # หน้าเว็บ UI ด้วย Streamlit
 └── requirements.txt
 ```
@@ -32,8 +32,7 @@ pip install -r requirements.txt
 
 ## Run
 ```bash
-streamlit run app.py          # Web App (Image + Live Webcam)
-python webcam_demo.py         # (optional) ทดสอบกล้องบนเครื่องโดยไม่ผ่านเว็บ
+streamlit run app.py
 ```
 
 ## Docs
