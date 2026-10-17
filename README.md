@@ -14,7 +14,7 @@ Web App ตรวจจับและเซ็นเซอร์ใบหน้
 ## Project Structure
 ```text
 ├── docs/             # Contract, Git Flow, Schedule
-├── models/           # โมเดลตรวจจับใบหน้า (blaze_face_short_range.tflite)
+├── models/           # โมเดลตรวจจับใบหน้า (MediaPipe, YuNet, Haar สำรอง)
 ├── test_images/      # ภาพสำหรับทดสอบ
 ├── tests/            # Unit tests ของ detector.py (pytest)
 ├── detector.py       # ตรวจจับใบหน้าและฟังก์ชันเบลอ/โมเสก
