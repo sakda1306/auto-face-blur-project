@@ -46,7 +46,7 @@ python -m pytest tests
 ทดสอบตาราง Test Contract (`docs/CONTRACT.md` หัวข้อ 6) กับภาพใน `test_images/`
 ```bash
 python run_test_contract.py                    # ภาพที่ยังไม่มีจะขึ้น SKIP
-python run_test_contract.py --group-faces 12   # ระบุจำนวนหน้าจริงใน group_photo.jpg
+python run_test_contract.py --group-faces 4    # group_photo.jpg มี 4 หน้า
 python run_test_contract.py --save             # บันทึกภาพพร้อมกรอบใบหน้าไว้ที่ output/
 ```
 
