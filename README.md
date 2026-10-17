@@ -15,6 +15,7 @@ Web App ตรวจจับและเซ็นเซอร์ใบหน้
 ```text
 ├── docs/             # Contract, Git Flow, Schedule
 ├── models/           # โมเดลตรวจจับใบหน้า (MediaPipe, YuNet, Haar สำรอง)
+├── static/           # CSS, ภาพตัวอย่าง และมาสคอตของหน้าเว็บ
 ├── test_images/      # ภาพสำหรับทดสอบ
 ├── tests/            # Unit tests ของ detector.py (pytest)
 ├── detector.py       # ตรวจจับใบหน้าและฟังก์ชันเบลอ/โมเสก
