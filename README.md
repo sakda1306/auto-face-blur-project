@@ -16,6 +16,7 @@ Web App ตรวจจับและเซ็นเซอร์ใบหน้
 ├── docs/             # Contract, Git Flow, Schedule
 ├── models/           # โมเดลตรวจจับใบหน้า (blaze_face_short_range.tflite)
 ├── test_images/      # ภาพสำหรับทดสอบ
+├── tests/            # Unit tests ของ detector.py (pytest)
 ├── detector.py       # ตรวจจับใบหน้าและฟังก์ชันเบลอ/โมเสก
 ├── app.py            # หน้าเว็บ UI ด้วย Streamlit
 └── requirements.txt
@@ -33,6 +34,12 @@ pip install -r requirements.txt
 ## Run
 ```bash
 streamlit run app.py
+```
+
+## Test
+```bash
+pip install pytest
+python -m pytest tests
 ```
 
 ## Docs

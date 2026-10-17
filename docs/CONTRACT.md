@@ -57,9 +57,10 @@
 | Input | `image: Image`, `min_confidence: float` ในช่วง `0.0–1.0` |
 | Output | รายการ `BBox` ของทุกใบหน้า เรียงจากซ้ายไปขวา (ตามค่า `x`) |
 | ไม่พบใบหน้า | คืนค่า `[]` (ห้าม raise error) |
+| ใบหน้าเล็ก | โมเดล short range ย่อภาพเหลือ 128×128 ทำให้หน้าเล็กในภาพใหญ่หายไป จึงตรวจทั้งภาพ + ตรวจซ้ำบน Tile ขนาด 640 และ 320 px (ซ้อนกัน 25%) แล้วรวมกรอบที่ทับกันเกิน 50% เป็นกรอบเดียว (union) Tile ใช้ score ขั้นต่ำ 0.65 เพื่อกัน False positive ตรวจได้ถึงหน้ากว้าง ~50 px ในภาพ 1920×1080 (~0.1 วินาที/ภาพ) |
 | Side effect | ห้ามแก้ไข `image` ต้นฉบับ |
-| Implementation | ใช้ MediaPipe **Tasks API** (`mediapipe.tasks.python.vision.FaceDetector`) กับโมเดล `models/blaze_face_short_range.tflite` เป็นหลัก และ Haar Cascade (`cv2.data.haarcascades`) เป็นตัวสำรองถ้าโหลด MediaPipe ไม่ได้ โมเดลต้องสร้างครั้งเดียว (lazy singleton) ห้ามสร้างใหม่ทุกครั้งที่เรียก |
-| หมายเหตุ | mediapipe 1.x **ไม่มี** `mp.solutions.face_detection` แบบเก่าแล้ว ตัวอย่างโค้ดเก่าในอินเทอร์เน็ตจะใช้ไม่ได้ และ Tasks API รับภาพเป็น RGB (`mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)`) จึงต้องแปลงจาก BGR ก่อนส่งเข้าโมเดล |
+| Implementation | ใช้ MediaPipe **Tasks API** (`mediapipe.tasks.python.vision.FaceDetector`) กับโมเดล `models/blaze_face_short_range.tflite` เป็นหลัก และ Haar Cascade (`models/haarcascade_frontalface_default.xml`) เป็นตัวสำรองถ้าโหลด MediaPipe ไม่ได้ โมเดลต้องสร้างครั้งเดียว (lazy singleton) ห้ามสร้างใหม่ทุกครั้งที่เรียก |
+| หมายเหตุ | mediapipe 1.x **ไม่มี** `mp.solutions.face_detection` แบบเก่าแล้ว ตัวอย่างโค้ดเก่าในอินเทอร์เน็ตจะใช้ไม่ได้ และ Tasks API รับภาพเป็น RGB (`mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)`) จึงต้องแปลงจาก BGR ก่อนส่งเข้าโมเดล และ opencv-python 5.x **ไม่มีไฟล์ Haar `.xml` มาให้** ใน `cv2.data.haarcascades` แล้ว จึงต้องใช้ไฟล์ใน `models/` |
 
 ### 3.2 `clip_box(box, image_shape) -> BBox | None`
 บีบ BBox ให้อยู่ในขอบภาพ ถ้าหลังบีบแล้ว `w ≤ 0` หรือ `h ≤ 0` ให้คืน `None`
@@ -136,6 +137,7 @@ streamlit==1.65.0
 | ไฟล์ | ที่มา |
 |------|------|
 | `models/blaze_face_short_range.tflite` | โมเดลตรวจจับใบหน้าระยะใกล้ของ MediaPipe (230 KB) commit ไว้ใน repo เพื่อไม่ต้องดาวน์โหลดตอนรัน |
+| `models/haarcascade_frontalface_default.xml` | Haar Cascade ตรวจจับใบหน้า (930 KB) จาก repo OpenCV branch `4.x` ใช้เป็นตัวสำรอง |
 
 ถ้าต้องเพิ่มหรืออัปเกรดไลบรารี ให้แก้ทั้ง `requirements.txt` และหัวข้อนี้ใน PR เดียวกัน และต้องทดสอบติดตั้งใน venv ใหม่ก่อนเปิด PR
 
