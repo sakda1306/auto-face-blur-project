@@ -88,6 +88,12 @@ def test_detect_multiple_faces_sorted_left_to_right(portrait):
         assert_inside(box, pair.shape)
 
 
+def test_no_false_face_on_background(portrait):
+    # The eagle seal behind the face looks like a face to the model inside a tile.
+    triple = np.hstack([portrait, portrait, portrait])
+    assert len(detector.detect_faces(triple)) == 3
+
+
 def test_detect_face_on_image_edge(portrait):
     # Cut the image through the middle of the face.
     edge = np.ascontiguousarray(portrait[:, 400:])
@@ -108,14 +114,14 @@ def place_faces(portrait, sizes):
     return canvas
 
 
-@pytest.mark.parametrize("size", [200, 120, 80, 60, 50])
+@pytest.mark.parametrize("size", [200, 120, 80, 60, 50, 40])
 def test_detect_small_face_in_large_image(portrait, size):
     boxes = detector.detect_faces(place_faces(portrait, [size]))
     assert len(boxes) == 1
 
 
 def test_detect_group_of_different_sizes(portrait):
-    sizes = [160, 100, 70, 60, 50, 50]
+    sizes = [160, 100, 70, 50, 40, 40]
     boxes = detector.detect_faces(place_faces(portrait, sizes))
     assert len(boxes) == len(sizes)
 

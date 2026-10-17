@@ -19,9 +19,11 @@ HAAR_MODEL = MODEL_DIR / "haarcascade_frontalface_default.xml"
 # vanish. Run it on the whole image and again on overlapping tiles of these sizes.
 TILE_SIZES = (640, 320)
 TILE_OVERLAP = 0.25
-# Cropped tiles produce more false faces (scores up to ~0.63 in testing), while real
-# faces found in tiles score above ~0.65, so tile detections need at least this score.
-TILE_MIN_SCORE = 0.65
+# Tiles cut objects out of context, so the model also finds false faces there (an eagle
+# seal scored 0.66). A tile detection is kept only if the model finds it again in a crop
+# RECHECK_CONTEXT times the box size around it: real faces score ~0.9 there, the seal 0.13.
+TILE_MIN_SCORE = 0.5
+RECHECK_CONTEXT = 2
 
 # The detector is built once per process; see CONTRACT.md 4.3.
 _detector = None
@@ -55,8 +57,23 @@ def _create_mediapipe_detector():
         for size in TILE_SIZES:
             for x0, y0 in _tiles(rgb.shape[:2], size):
                 tile = np.ascontiguousarray(rgb[y0:y0 + size, x0:x0 + size])
-                faces.extend(f for f in detect(tile, x0, y0) if f[4] >= TILE_MIN_SCORE)
+                for face in detect(tile, x0, y0):
+                    if face[4] >= TILE_MIN_SCORE:
+                        faces.append(face[:4] + (recheck(rgb, face),))
         return faces
+
+    def recheck(rgb, face):
+        """Score of the face when detected again in a square crop around it, else 0."""
+        x, y, w, h = face[:4]
+        cx, cy = x + w / 2, y + h / 2
+        side = int(max(w, h) * RECHECK_CONTEXT)
+        x0, y0 = int(max(0, cx - side / 2)), int(max(0, cy - side / 2))
+        crop = np.ascontiguousarray(rgb[y0:y0 + side, x0:x0 + side])
+        scores = [
+            score for fx, fy, fw, fh, score in detect(crop, x0, y0)
+            if fx <= cx <= fx + fw and fy <= cy <= fy + fh
+        ]
+        return max(scores, default=0.0)
 
     return run
 

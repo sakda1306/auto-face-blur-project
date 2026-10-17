@@ -18,6 +18,7 @@ Web App ตรวจจับและเซ็นเซอร์ใบหน้
 ├── test_images/      # ภาพสำหรับทดสอบ
 ├── tests/            # Unit tests ของ detector.py (pytest)
 ├── detector.py       # ตรวจจับใบหน้าและฟังก์ชันเบลอ/โมเสก
+├── run_test_contract.py  # รันทุกกรณีใน Test Contract
 ├── app.py            # หน้าเว็บ UI ด้วย Streamlit
 └── requirements.txt
 ```
@@ -40,6 +41,13 @@ streamlit run app.py
 ```bash
 pip install pytest
 python -m pytest tests
+```
+
+ทดสอบตาราง Test Contract (`docs/CONTRACT.md` หัวข้อ 6) กับภาพใน `test_images/`
+```bash
+python run_test_contract.py                    # ภาพที่ยังไม่มีจะขึ้น SKIP
+python run_test_contract.py --group-faces 12   # ระบุจำนวนหน้าจริงใน group_photo.jpg
+python run_test_contract.py --save             # บันทึกภาพพร้อมกรอบใบหน้าไว้ที่ output/
 ```
 
 ## Docs
