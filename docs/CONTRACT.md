@@ -108,7 +108,7 @@
 | Widget | Label | ค่าที่ส่งเข้า `blur_faces` |
 |--------|-------|------------------------|
 | `st.radio` | `Gaussian Blur` / `Mosaic` / `BBox Only` | `"blur"` / `"mosaic"` / `"bbox"` |
-| `st.slider` | `ความเข้มข้น` (1–100, ค่าเริ่มต้น 50) ซ่อนในโหมด `BBox Only` เพราะไม่ใช้ค่านี้ (ส่ง 50) | `strength` |
+| `st.slider` | `ความเข้มข้น` (1–100, ค่าเริ่มต้น 50) ซ่อน (Sidebar) หรือปิดใช้งาน (แถบเหนือผลลัพธ์) ในโหมด `BBox Only` เพราะไม่ใช้ค่านี้ (ส่ง 50) | `strength` |
 
 ### 4.2 หน้าหลัก (Image Upload)
 1. `st.file_uploader` รับ `jpg`, `jpeg`, `png`

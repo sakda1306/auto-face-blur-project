@@ -98,10 +98,11 @@ def hero_illustration():
     )
 
 
-def section_head(plain, accent, sub, anchor=""):
+def section_head(plain, accent, sub, anchor="", compact=False):
     anchor_attr = f' id="{anchor}"' if anchor else ""
+    css = "section-head compact" if compact else "section-head"
     st.markdown(
-        f'<div class="section-head"{anchor_attr}><div class="section-title">{plain}<span>{accent}</span></div>'
+        f'<div class="{css}"{anchor_attr}><div class="section-title">{plain}<span>{accent}</span></div>'
         f'<div class="section-sub">{sub}</div></div>',
         unsafe_allow_html=True,
     )
@@ -124,6 +125,15 @@ def show_hero():
     )
 
 
+def show_hero_compact():
+    """Slim header used once an image is loaded, so the result sits near the top."""
+    st.markdown(
+        '<div class="hero hero-compact"><div class="hero-title">AUTO FACE BLUR</div>'
+        '<div class="hero-sub">เซ็นเซอร์ใบหน้าในภาพอัตโนมัติ คุ้มครองความเป็นส่วนตัวตาม PDPA</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
 def show_steps():
     cards = "".join(
         f'<div class="step{" featured" if i == 0 else ""}">'
@@ -134,6 +144,13 @@ def show_steps():
     )
     section_head("วิธี", "ใช้งาน ?", "ครบในสามขั้นตอน ไม่ต้องติดตั้งอะไรเพิ่ม")
     st.markdown(f'<div class="steps">{cards}</div>', unsafe_allow_html=True)
+
+
+@st.cache_data(max_entries=24, show_spinner=False)
+def process(data, mode, strength):
+    """Decode the uploaded bytes and run blur_faces. Cached, so switching tabs or moving
+    the slider back to an earlier value does not run face detection again."""
+    return blur_faces(decode_upload(data), mode, strength)
 
 
 def decode_upload(data):
@@ -249,27 +266,73 @@ if corner_logo.exists():
 st.markdown(f"<style>{STYLE.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
 show_mascot()
 
+# --- Controls ---
+# Mode and strength live in shared session keys. The sidebar (CONTRACT.md 4.1) and the bar
+# above the result are two views of the same setting: each widget copies its value into the
+# shared key when changed, and every run copies the shared value back into both widgets.
+st.session_state.setdefault("mode_label", list(MODES)[0])
+st.session_state.setdefault("strength", DEFAULT_STRENGTH)
+
+
+def sync(widget_key, shared_key):
+    value = st.session_state.get(widget_key)
+    if value is not None:  # a segmented control can be clicked off; keep the last mode then
+        st.session_state[shared_key] = value
+
+
+for widget_key in ("sb_mode", "top_mode"):
+    st.session_state[widget_key] = st.session_state["mode_label"]
+for widget_key in ("sb_strength", "top_strength"):
+    st.session_state[widget_key] = st.session_state["strength"]
+
+mode_label = st.session_state["mode_label"]
+mode = MODES[mode_label]
+# bbox mode ignores strength, but blur_faces still rejects values outside 1-100.
+strength = DEFAULT_STRENGTH if mode == "bbox" else st.session_state["strength"]
+
 # --- Sidebar (CONTRACT.md 4.1) ---
 with st.sidebar:
     st.header(":material/settings: ตั้งค่า")
-    mode_label = st.radio("รูปแบบการเซ็นเซอร์", list(MODES), captions=MODE_HINTS)
-    mode = MODES[mode_label]
-    if mode == "bbox":
-        # bbox mode ignores strength, but blur_faces still rejects values outside 1-100.
-        strength = DEFAULT_STRENGTH
-    else:
-        strength = st.slider("ความเข้มข้น", min_value=1, max_value=100, value=DEFAULT_STRENGTH)
+    st.radio("รูปแบบการเซ็นเซอร์", list(MODES), captions=MODE_HINTS,
+             key="sb_mode", on_change=sync, args=("sb_mode", "mode_label"))
+    if mode != "bbox":
+        st.slider("ความเข้มข้น", min_value=1, max_value=100,
+                  key="sb_strength", on_change=sync, args=("sb_strength", "strength"))
     st.divider()
     st.caption(":material/lock: ภาพใช้ประมวลผลชั่วคราวเท่านั้น ไม่ถูกบันทึกหรือส่งต่อ")
 
-show_hero()
+
+def show_controls():
+    """Mode and strength right above the result, synced with the sidebar."""
+    with st.container(key="controls"):
+        left, right = st.columns([3, 2], gap="large", vertical_alignment="center")
+        left.segmented_control(
+            "รูปแบบการเซ็นเซอร์", list(MODES), key="top_mode",
+            on_change=sync, args=("top_mode", "mode_label"), width="stretch",
+        )
+        right.slider(
+            "ความเข้มข้น", min_value=1, max_value=100, key="top_strength",
+            on_change=sync, args=("top_strength", "strength"), disabled=mode == "bbox",
+            help="โหมด BBox Only ไม่ใช้ค่าความเข้มข้น" if mode == "bbox" else None,
+        )
+
+
+# With an image loaded (uploaded or sample), shrink the header so the result is near the top.
+has_image = st.session_state.get("uploader") is not None or (
+    st.session_state.get("use_sample", False) and SAMPLE_IMAGE.exists()
+)
+if has_image:
+    show_hero_compact()
+else:
+    show_hero()
+    section_head("เริ่ม", "เซ็นเซอร์ภาพ", "ภาพใช้ประมวลผลชั่วคราว ไม่ถูกบันทึกหรือส่งต่อ", anchor="upload")
 
 # --- Upload (CONTRACT.md 4.2) ---
-section_head("เริ่ม", "เซ็นเซอร์ภาพ", "ภาพใช้ประมวลผลชั่วคราว ไม่ถูกบันทึกหรือส่งต่อ", anchor="upload")
 uploaded = st.file_uploader(
     f"อัปโหลดภาพ (JPG/PNG, ไม่เกิน {MAX_FILE_MB} MB)",
     type=["jpg", "jpeg", "png"],
     label_visibility="collapsed",
+    key="uploader",
 )
 if uploaded is not None:
     st.session_state["use_sample"] = False
@@ -293,15 +356,16 @@ if original is None:
     st.stop()
 
 with st.spinner("กำลังตรวจจับใบหน้า..."):
-    result, face_count = blur_faces(original, mode, strength)
+    result, face_count = process(data, mode, strength)
 
 # --- Result ---
-section_head("ผล", "ลัพธ์", escape(file_name))
+section_head("ผล", "ลัพธ์", escape(file_name), compact=True)
 if uploaded is None:
     note, back = st.columns([4, 1], vertical_alignment="center")
     note.caption(":material/info: กำลังใช้ภาพตัวอย่าง อัปโหลดภาพของคุณเองได้ที่กล่องด้านบน")
     back.button("ปิดภาพตัวอย่าง", icon=":material/close:", on_click=use_sample, args=(False,), width="stretch")
 height, width = original.shape[:2]
+show_controls()
 faces_col, mode_col, size_col = st.columns(3)
 faces_col.metric("จำนวนใบหน้าที่พบ", face_count)
 mode_col.metric("โหมด", mode_label)
