@@ -158,7 +158,7 @@ streamlit==1.65.0
 | `no_face.jpg` | ไม่มีคน | `face_count == 0` และไม่ error |
 | `edge_face.jpg` | ใบหน้าชิดขอบภาพ | ไม่ error, BBox ไม่หลุดขอบ |
 
-รันทุกกรณีพร้อมกันด้วย `python run_test_contract.py --group-faces <จำนวนหน้าจริงใน group_photo.jpg>`
+รันทุกกรณีพร้อมกันด้วย `python run_test_contract.py --group-faces 4` (`group_photo.jpg` มี 4 หน้า ดูรายละเอียดภาพใน `test_images/README.md`)
 ผลเป็น `PASS` / `FAIL` / `SKIP` (ไม่มีภาพ) / `CHECK` (ยังไม่ได้ระบุ `--group-faces`) และ exit code เป็น 1 เมื่อมีกรณี `FAIL`
 
 งานจะถือว่า "เสร็จ" เมื่อ
