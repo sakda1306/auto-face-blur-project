@@ -19,9 +19,10 @@ feature/...       ●───●   ●───●
 | `feature/<งาน>` | พัฒนาฟีเจอร์ 1 งาน | เจ้าของงาน |
 | `fix/<งาน>` | แก้บั๊ก | ใครก็ได้ |
 | `docs/<งาน>` | แก้เอกสาร/รายงาน | ใครก็ได้ |
+| `test/<งาน>` | เพิ่มภาพ/โค้ดทดสอบ | ใครก็ได้ |
 
 **ชื่อ branch** ใช้ตัวพิมพ์เล็กและขีดกลาง เช่น
-`feature/face-detection`, `feature/blur-mosaic`, `feature/web-ui`, `feature/live-webcam`, `fix/bbox-out-of-range`
+`feature/face-detection`, `feature/blur-mosaic`, `feature/web-ui`, `test/test-images`, `fix/bbox-out-of-range`
 
 ## 2. ขั้นตอนทำงานประจำวัน
 

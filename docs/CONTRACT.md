@@ -9,16 +9,15 @@
 
 ## 1. ภาพรวมสถาปัตยกรรม (Architecture)
 
-ระบบเป็น **Web App ด้วย Streamlit** มี 2 โหมดการใช้งานบนหน้าเว็บเดียวกัน
+ระบบเป็น **Web App ด้วย Streamlit** ที่รับเฉพาะ **ภาพที่ผู้ใช้อัปโหลด (Import)** เท่านั้น ไม่มีการใช้กล้อง/Webcam
 
 ```text
-┌───────────────────────── Browser ─────────────────────────┐
-│  Sidebar: โหมด (Blur / Mosaic / BBox) + Slider ความเข้ม     │
-│  Tab 1 "Image"        │  Tab 2 "Live Webcam"               │
-│  อัปโหลดภาพ → Before/After│  กล้องผ่าน WebRTC → ภาพสด + FPS      │
-└───────────┬───────────────────────────┬───────────────────┘
-            │ app.py (UI Layer)         │ streamlit-webrtc
-            ▼                           ▼
+┌──────────────────── Browser ────────────────────┐
+│  Sidebar: โหมด (Blur / Mosaic / BBox) + Slider    │
+│  Main: อัปโหลดภาพ → Before/After → ดาวน์โหลด        │
+└────────────────────────┬────────────────────────┘
+                         │ app.py (UI Layer)
+                         ▼
      ┌──────────────────────────────────────────┐
      │ detector.py (Core Layer, ไม่มีโค้ด UI)       │
      │ detect_faces → clip_box → obfuscate → merge │
@@ -29,10 +28,8 @@
 |-------|------|--------|--------|
 | Core | `detector.py` | ตรวจจับใบหน้า, เบลอ, โมเสก, วาดกรอบ | ห้าม `import streamlit` |
 | Web UI | `app.py` | อัปโหลด, ปุ่ม, Slider, แสดงผล, ดาวน์โหลด | ห้ามเขียน logic การเบลอเอง |
-| Live | `app.py` (Tab 2) | รับเฟรมจากกล้องผ่าน `streamlit-webrtc` | ห้ามใช้ `cv2.VideoCapture` บนเว็บ |
-| CLI (optional) | `webcam_demo.py` | ทดสอบกล้องบนเครื่องตัวเองแบบไม่ผ่านเว็บ | - |
 
-> หมายเหตุ: บนเว็บต้องใช้ `streamlit-webrtc` เพราะ `cv2.VideoCapture(0)` จะเปิดกล้องของ **เครื่อง Server** ไม่ใช่กล้องของผู้ใช้ที่เปิดเบราว์เซอร์
+> **Out of scope:** กล้องสด/Webcam, วิดีโอ และ `streamlit-webrtc` ไม่อยู่ในขอบเขตงานนี้
 
 ---
 
@@ -61,7 +58,7 @@
 | Output | รายการ `BBox` ของทุกใบหน้า เรียงจากซ้ายไปขวา (ตามค่า `x`) |
 | ไม่พบใบหน้า | คืนค่า `[]` (ห้าม raise error) |
 | Side effect | ห้ามแก้ไข `image` ต้นฉบับ |
-| Implementation | ใช้ MediaPipe **Tasks API** (`mediapipe.tasks.python.vision.FaceDetector`) กับโมเดล `models/blaze_face_short_range.tflite` เป็นหลัก และ Haar Cascade (`cv2.data.haarcascades`) เป็นตัวสำรองถ้าโหลด MediaPipe ไม่ได้ โมเดลต้องสร้างครั้งเดียว (lazy singleton) ห้ามสร้างใหม่ทุกเฟรม |
+| Implementation | ใช้ MediaPipe **Tasks API** (`mediapipe.tasks.python.vision.FaceDetector`) กับโมเดล `models/blaze_face_short_range.tflite` เป็นหลัก และ Haar Cascade (`cv2.data.haarcascades`) เป็นตัวสำรองถ้าโหลด MediaPipe ไม่ได้ โมเดลต้องสร้างครั้งเดียว (lazy singleton) ห้ามสร้างใหม่ทุกครั้งที่เรียก |
 | หมายเหตุ | mediapipe 1.x **ไม่มี** `mp.solutions.face_detection` แบบเก่าแล้ว ตัวอย่างโค้ดเก่าในอินเทอร์เน็ตจะใช้ไม่ได้ และ Tasks API รับภาพเป็น RGB (`mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)`) จึงต้องแปลงจาก BGR ก่อนส่งเข้าโมเดล |
 
 ### 3.2 `clip_box(box, image_shape) -> BBox | None`
@@ -104,13 +101,13 @@
 
 ## 4. Web UI Contract: `app.py`
 
-### 4.1 Sidebar (ใช้ร่วมกันทั้ง 2 Tab)
+### 4.1 Sidebar
 | Widget | Label | ค่าที่ส่งเข้า `blur_faces` |
 |--------|-------|------------------------|
 | `st.radio` | `Gaussian Blur` / `Mosaic` / `BBox Only` | `"blur"` / `"mosaic"` / `"bbox"` |
 | `st.slider` | `ความเข้มข้น` (1–100, ค่าเริ่มต้น 50) | `strength` |
 
-### 4.2 Tab "Image"
+### 4.2 หน้าหลัก (Image Upload)
 1. `st.file_uploader` รับ `jpg`, `jpeg`, `png`
 2. แปลงไฟล์เป็น `Image` (BGR) ด้วย `cv2.imdecode`
 3. เรียก `blur_faces(image, mode, strength)`
@@ -118,14 +115,8 @@
 5. `st.metric("จำนวนใบหน้าที่พบ", face_count)` ถ้าเป็น 0 ให้แสดง `st.info("ไม่พบใบหน้าในภาพ")`
 6. `st.download_button` ดาวน์โหลดเป็น PNG ชื่อ `<ชื่อไฟล์เดิม>_blurred.png`
 
-### 4.3 Tab "Live Webcam"
-1. ใช้ `webrtc_streamer` จาก `streamlit-webrtc`
-2. ใน `video_frame_callback`: `frame.to_ndarray(format="bgr24")` → `blur_faces(...)` → วาดค่า FPS มุมซ้ายบน → คืน `av.VideoFrame.from_ndarray(..., format="bgr24")`
-3. ค่า `mode` และ `strength` อ่านจาก Sidebar
-4. เป้าหมายประสิทธิภาพ: **≥ 15 FPS** ที่ความละเอียด 640×480
-
-### 4.4 Caching
-ตัวตรวจจับใบหน้าต้องสร้างครั้งเดียวต่อ process (singleton ใน `detector.py`) ห้ามสร้างใหม่ทุกครั้งที่ Streamlit rerun
+### 4.3 Caching
+ตัวตรวจจับใบหน้าต้องสร้างครั้งเดียวต่อ process (singleton ใน `detector.py`) ห้ามสร้างใหม่ทุกครั้งที่ Streamlit rerun (ทุกครั้งที่ขยับ Slider)
 
 ---
 
@@ -140,7 +131,6 @@ opencv-python==5.0.0.93
 mediapipe==1.0.1
 numpy==2.5.3
 streamlit==1.65.0
-streamlit-webrtc==0.78.1
 ```
 
 | ไฟล์ | ที่มา |

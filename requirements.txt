@@ -3,4 +3,3 @@ opencv-python==5.0.0.93
 mediapipe==1.0.1
 numpy==2.5.3
 streamlit==1.65.0
-streamlit-webrtc==0.78.1
