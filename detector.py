@@ -13,17 +13,21 @@ MODES = ("blur", "mosaic", "bbox")
 
 MODEL_DIR = Path(__file__).resolve().parent / "models"
 MEDIAPIPE_MODEL = MODEL_DIR / "blaze_face_short_range.tflite"
+YUNET_MODEL = MODEL_DIR / "face_detection_yunet_2023mar.onnx"
 HAAR_MODEL = MODEL_DIR / "haarcascade_frontalface_default.xml"
 
-# The short-range model shrinks its input to 128x128, so small faces in a big photo
-# vanish. Run it on the whole image and again on overlapping tiles of these sizes.
-TILE_SIZES = (640, 320)
-TILE_OVERLAP = 0.25
-# Tiles cut objects out of context, so the model also finds false faces there (an eagle
-# seal scored 0.66). A tile detection is kept only if the model finds it again in a crop
-# RECHECK_CONTEXT times the box size around it: real faces score ~0.9 there, the seal 0.13.
-TILE_MIN_SCORE = 0.5
-RECHECK_CONTEXT = 2
+# Every image is resized so its long side is WORK_SIZE before detection: a 300 px web image
+# has faces too small for the models (issue #6), and a 6000 px photo is slow for no gain.
+WORK_SIZE = 1920
+
+# Two detectors run on every image and their boxes are merged. MediaPipe short range is
+# good at big, close and side faces but misses small faces; YuNet finds small faces in a
+# crowd but misses very close faces and full profiles. YuNet boxes need this score; lower
+# scores gave false faces on the test photos.
+YUNET_MIN_SCORE = 0.7
+
+# Faces larger than this (shorter side, px) are blurred on a scaled-down copy for speed.
+BLUR_MAX_SIDE = 256
 
 # The detector is built once per process; see CONTRACT.md 4.3.
 _detector = None
@@ -42,62 +46,40 @@ def _create_mediapipe_detector():
     )
     model = vision.FaceDetector.create_from_options(options)
 
-    def detect(rgb, x0, y0):
+    def run(image):
+        rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         result = model.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb))
         faces = []
         for detection in result.detections:
             box = detection.bounding_box
             score = detection.categories[0].score if detection.categories else 1.0
-            faces.append((box.origin_x + x0, box.origin_y + y0, box.width, box.height, score))
+            faces.append((box.origin_x, box.origin_y, box.width, box.height, score))
         return faces
-
-    def run(image):
-        rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        faces = detect(rgb, 0, 0)
-        for size in TILE_SIZES:
-            for x0, y0 in _tiles(rgb.shape[:2], size):
-                tile = np.ascontiguousarray(rgb[y0:y0 + size, x0:x0 + size])
-                for face in detect(tile, x0, y0):
-                    if face[4] >= TILE_MIN_SCORE:
-                        faces.append(face[:4] + (recheck(rgb, face),))
-        return faces
-
-    def recheck(rgb, face):
-        """Score of the face when detected again in a square crop around it, else 0."""
-        x, y, w, h = face[:4]
-        cx, cy = x + w / 2, y + h / 2
-        side = int(max(w, h) * RECHECK_CONTEXT)
-        x0, y0 = int(max(0, cx - side / 2)), int(max(0, cy - side / 2))
-        crop = np.ascontiguousarray(rgb[y0:y0 + side, x0:x0 + side])
-        scores = [
-            score for fx, fy, fw, fh, score in detect(crop, x0, y0)
-            if fx <= cx <= fx + fw and fy <= cy <= fy + fh
-        ]
-        return max(scores, default=0.0)
 
     return run
 
 
-def _tiles(shape, size):
-    """Top-left corners of overlapping size x size tiles covering an image of this shape."""
-    height, width = shape
-    if max(height, width) <= size:
-        return []
-    step = int(size * (1 - TILE_OVERLAP))
+def _create_yunet_detector():
+    """Build an OpenCV YuNet face detector. Returns fn(bgr) -> [(x, y, w, h, score)]."""
+    # Load from bytes for the same path reason as MediaPipe.
+    model = cv2.FaceDetectorYN.create(
+        "onnx", np.frombuffer(YUNET_MODEL.read_bytes(), np.uint8), np.empty(0, np.uint8),
+        (320, 320), YUNET_MIN_SCORE, 0.3, 5000,
+    )
 
-    def starts(length):
-        if length <= size:
-            return [0]
-        points = list(range(0, length - size + 1, step))
-        if points[-1] + size < length:
-            points.append(length - size)
-        return points
+    def run(image):
+        model.setInputSize((image.shape[1], image.shape[0]))
+        _, found = model.detect(image)
+        if found is None:
+            return []
+        # Each row is x, y, w, h, 10 landmark values, score.
+        return [(int(f[0]), int(f[1]), int(f[2]), int(f[3]), float(f[-1])) for f in found]
 
-    return [(x, y) for y in starts(height) for x in starts(width)]
+    return run
 
 
 def _merge_overlapping(boxes, threshold=0.5):
-    """Merge boxes that cover the same face (from overlapping tiles) into their union."""
+    """Merge boxes that cover the same face (found by both detectors) into their union."""
     boxes = [tuple(box) for box in boxes]
     merged = True
     while merged:
@@ -129,27 +111,45 @@ def _create_haar_detector():
 
     def run(image):
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        found = cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        # minNeighbors=6 (not the usual 5) drops a false face that appears at WORK_SIZE.
+        found = cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=6, minSize=(30, 30))
         return [(x, y, w, h, 1.0) for x, y, w, h in found]
 
     return run
 
 
 def _get_detector():
+    """Build MediaPipe and YuNet once; use Haar only if neither of them loads."""
     global _detector
     if _detector is None:
-        try:
-            _detector = _create_mediapipe_detector()
-        except Exception:
-            _detector = _create_haar_detector()
+        runs = []
+        for create in (_create_mediapipe_detector, _create_yunet_detector):
+            try:
+                runs.append(create())
+            except Exception:
+                pass
+        if not runs:
+            runs.append(_create_haar_detector())
+        _detector = lambda image: [face for run in runs for face in run(image)]
     return _detector
 
 
 def detect_faces(image, min_confidence=0.5):
     """Return a list of (x, y, w, h) boxes, clipped to the image, sorted by x."""
-    found = [face[:4] for face in _get_detector()(image) if face[4] >= min_confidence]
-    boxes = (clip_box(box, image.shape) for box in _merge_overlapping(found))
-    return sorted(box for box in boxes if box is not None)
+    scale = WORK_SIZE / max(image.shape[:2])
+    interpolation = cv2.INTER_AREA if scale < 1 else cv2.INTER_CUBIC
+    work = cv2.resize(image, None, fx=scale, fy=scale, interpolation=interpolation)
+
+    found = [face[:4] for face in _get_detector()(work) if face[4] >= min_confidence]
+    boxes = []
+    for x, y, w, h in _merge_overlapping(found):
+        # Back to original pixels; round the corners so the box does not shrink.
+        x1, y1 = int(x / scale), int(y / scale)
+        x2, y2 = int(np.ceil((x + w) / scale)), int(np.ceil((y + h) / scale))
+        box = clip_box((x1, y1, x2 - x1, y2 - y1), image.shape)
+        if box is not None:
+            boxes.append(box)
+    return sorted(boxes)
 
 
 def clip_box(box, image_shape):
@@ -166,6 +166,13 @@ def clip_box(box, image_shape):
 def apply_gaussian_blur(roi, strength):
     """Blur the ROI with an odd kernel that scales with face size and strength (1-100)."""
     h, w = roi.shape[:2]
+    if min(h, w) > BLUR_MAX_SIDE:
+        # The kernel grows with the face, so a 4000 px face would take minutes. Blur a
+        # smaller copy with the same relative kernel and scale it back; the result looks
+        # the same because only coarse detail is left after such a strong blur.
+        scale = BLUR_MAX_SIDE / min(h, w)
+        small = cv2.resize(roi, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+        return cv2.resize(apply_gaussian_blur(small, strength), (w, h), interpolation=cv2.INTER_LINEAR)
     k = max(3, int(min(h, w) * strength / 100)) | 1
     return cv2.GaussianBlur(roi, (k, k), 0)
 
