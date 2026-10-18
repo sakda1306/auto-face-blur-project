@@ -1,0 +1,16 @@
+[theme]
+base = "light"
+primaryColor = "#E5305B"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4F1FB"
+textColor = "#1F1B2E"
+font = "sans serif"
+
+[server]
+# Serves files in static/ at app/static/ (the mascot logo).
+enableStaticServing = true
+# Matches the 5 MB limit in app.py, so the uploader no longer says "200MB per file".
+maxUploadSize = 5
+
+[browser]
+gatherUsageStats = false
